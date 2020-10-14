@@ -1,8 +1,21 @@
+import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:hello_world/searchList.dart';
 import 'package:hello_world/searchWidget/SearchTopScreen.dart';
+import 'package:hello_world/searchWidget/TestWidget.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  Bloc.observer = MyObserver();
+  runApp(MyApp());
+}
+
+class MyObserver extends BlocObserver {
+  @override
+  void onChange(Cubit cubit, Change change) {
+    print('${cubit.runtimeType} $change');
+    super.onChange(cubit, change);
+  }
+}
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -10,7 +23,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -27,6 +39,7 @@ class MyApp extends StatelessWidget {
       // home: SwapColorDemo2(), //stateful without key
       // home: SwapColorDemo3(), //stateful with key
       home: SearchTopScreen(),
+      // home: TestScreen(),
     );
   }
 }

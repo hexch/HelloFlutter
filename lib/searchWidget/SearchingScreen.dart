@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hello_world/searchWidget/blocsForTest/bloc/searchbloc_bloc.dart';
 
 import 'SearchAppBar.dart';
 
@@ -18,7 +20,10 @@ class SearchingScreen extends PageRoute {
   @override
   Widget buildPage(BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation) {
-    return SearchingPageWidget();
+    return BlocProvider(
+      create: (context) => SearchblocBloc(),
+      child: SearchingPageWidget(),
+    );
   }
 }
 
@@ -30,11 +35,29 @@ class SearchingPageWidget extends StatefulWidget {
 }
 
 class _SearchingPageWidgetState extends State<SearchingPageWidget> {
+  FocusNode _focusNode;
+  @override
+  void initState() {
+    context.bloc<SearchblocBloc>().add(GetRecommandedKeyWordEvent("1"));
+    _focusNode = FocusNode();
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   var _queryString = "";
   _onChanged(value) {
     setState(() {
       _queryString = value;
     });
+  }
+
+  _onSubmitted(value) {
+    context.bloc<SearchblocBloc>().add(SearchContentsEvent(value));
   }
 
   _onClear() {
@@ -68,7 +91,9 @@ class _SearchingPageWidgetState extends State<SearchingPageWidget> {
             ),
           ),
           centerItem: SearchAppBarTitleCenterItem(
+            focusNode: _focusNode,
             onChanged: _onChanged,
+            onSubmitted: _onSubmitted,
             textEditingController: widget._textEditingController,
           ),
           border: BoxDecoration(
@@ -77,32 +102,109 @@ class _SearchingPageWidgetState extends State<SearchingPageWidget> {
           ),
         ),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SearchSectionBar(),
-          Divider(
-            color: Color(0xFFE0E0E0),
-            height: 1,
-          ),
-          Expanded(
-              child: SearchingPageList(
-            items: ["映画", "スイーツ", "コロナウイルス", "インテリア", "ホルダリング"],
-            onTap: _onListItemTaped,
-          )),
-        ],
+      body: BlocListener<SearchblocBloc, SearchblocState>(
+        listener: (context, state) {
+          if (state is SearchingContentsState) {
+            _showProgressDialog();
+          } else if (state is FailedSearchContentsState) {
+            _showFailedToast();
+          } else if (state is SearchContentsState) {
+            Navigator.pop(context);
+            if (state.section.isEmpty) {
+              _showErrorDialog();
+            } else {}
+          }
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SearchSectionBar(),
+            Divider(
+              color: Color(0xFFE0E0E0),
+              height: 1,
+            ),
+            Expanded(
+              child: BlocBuilder<SearchblocBloc, SearchblocState>(
+                  buildWhen: (previous, current) =>
+                      current is GetRecommendsWordState,
+                  builder: (context, state) {
+                    if (state is GetRecommendsWordState) {
+                      return SearchingPageList(
+                        items: state.recommendsWordList,
+                        onTap: _onListItemTaped,
+                      );
+                    }
+                    return Container();
+                  }),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  void _showProgressDialog() {
+    showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (context) => Container(
+              color: Colors.transparent,
+              child: Center(
+                child: SizedBox(
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        new AlwaysStoppedAnimation<Color>(Color(0xff808080)),
+                  ),
+                  height: 40,
+                  width: 40,
+                ),
+              ),
+            ));
+  }
+
+  void _showFailedToast() {
+    Navigator.pop(context);
+
+    Scaffold.of(context)
+        .showSnackBar(SnackBar(content: Text("送信に失敗しました")))
+        .closed
+        .then((reson) => _focusNode.requestFocus());
+  }
+
+  void _showErrorDialog() {
+    showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (context) => AlertDialog(
+              title: Text(
+                "記事が見つかりませんでした。",
+                style: TextStyle(fontSize: 16),
+              ),
+              actions: [
+                FlatButton(
+                  child: Text("OK"),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _focusNode.requestFocus();
+                  },
+                ),
+              ],
+            ));
   }
 }
 
 class SearchAppBarTitleCenterItem extends StatelessWidget {
   final TextEditingController textEditingController;
   final Function(String) onChanged;
-
+  final Function(String) onSubmitted;
+  final FocusNode focusNode;
   const SearchAppBarTitleCenterItem(
-      {Key key, @required this.textEditingController, @required this.onChanged})
+      {Key key,
+      @required this.focusNode,
+      @required this.textEditingController,
+      @required this.onChanged,
+      @required this.onSubmitted})
       : super(key: key);
 
   @override
@@ -113,7 +215,10 @@ class SearchAppBarTitleCenterItem extends StatelessWidget {
         child: TextField(
           controller: textEditingController,
           onChanged: onChanged,
+          onSubmitted: onSubmitted,
+          focusNode: focusNode,
           autofocus: true,
+          textInputAction: TextInputAction.search,
           style: TextStyle(fontSize: 17),
           enabled: true,
           decoration: InputDecoration(
@@ -226,7 +331,11 @@ class SearchSectionBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
-              onTap: () {},
+              onTap: () {
+                context
+                    .bloc<SearchblocBloc>()
+                    .add(GetRecommandedKeyWordEvent("1"));
+              },
             ),
           ),
         ],
